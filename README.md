@@ -1,59 +1,607 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SIM FORM
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Hakuhodo DY ONE社内向け・広告依頼申請システム。
 
-## About Laravel
+GAS（Google Apps Script）+ Notion DBで運用されていた仕組みを、**Laravel（PHP）+ Vue.js + MySQL**へ移行する形で開発しているプロジェクトです。
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+依頼者（営業）が媒体別の配信メニュー・予算・エリア・ターゲティングなどを入力し、各媒体の運用担当部署がその内容を確認・見積もり入力・ステータス管理を行うワークフローを実装しています。
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+本リポジトリは、実務で使用しているシステムをベースとした**クローン・ポートフォリオ用プロジェクト**です。実際の顧客情報・業務データ・認証情報等は使用していません。
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## 1. 開発背景・目的
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### 従来の業務
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+広告の見積もり依頼は、GAS + Notion DBを利用した仕組みで運用されていました。
 
-## Laravel Sponsors
+一方で、以下のような課題がありました。
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### 依頼者側
 
-### Premium Partners
+* 媒体や広告メニューに関する知識が必要
+* 必須情報の抜け漏れが発生する
+* 複数パターンを依頼する際に情報が分かりづらい
+* 過去の依頼内容を再利用しづらい
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### 運用担当側
 
-## Contributing
+* 依頼内容を確認・整理する必要がある
+* 不足情報がある場合、依頼者へ確認する必要がある
+* 見積もり作成時に過去データを探しづらい
+* 案件の担当者やステータスを把握しづらい
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+そこで、単純に入力フォームを置き換えるのではなく、
 
-## Code of Conduct
+**「依頼 → 部署振り分け → 内容確認 → 見積もり → ステータス管理」**
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+までを一連の業務フローとして扱える仕組みを構築しています。
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## 2. 業務フロー
 
-## License
+### 2.1 システム導入前
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```text
+営業担当
+   ↓
+メールで見積もり依頼
+   ↓
+運用担当が内容を確認
+   ↓
+不足情報・不明点を確認
+   ↓
+営業担当へ確認
+   ↓
+情報を整理・転記
+   ↓
+見積もり作成
+   ↓
+依頼者へ回答
+```
+
+メールを起点とした運用では、依頼内容の不足や確認、情報整理などに手作業が発生していました。
+
+---
+
+### 2.2 システム導入後
+
+```text
+営業担当
+   ↓
+ログイン
+   ↓
+ENTRY
+基本情報を入力
+   ↓
+PLATFORMS
+依頼する媒体を選択
+   ↓
+DETAIL-FORM
+媒体ごとの配信条件を入力
+   ↓
+申請
+   ↓
+担当部署を判定
+   ↓
+案件・媒体・パターン情報をDBへ保存
+   ↓
+運用担当へ通知
+   ↓
+部署別ダッシュボードで案件確認
+   ↓
+担当者・ステータスを更新
+   ↓
+見積もり指標を入力
+   ↓
+見積もり結果を確認
+```
+
+依頼時点で必要な情報をフォーム上に集約し、入力内容を構造化して保存することで、依頼から見積もり・案件管理までを一連の流れとして扱えるようにしています。
+
+---
+
+## 3. システム概要
+
+主な機能は以下の通りです。
+
+* 依頼者のログイン・新規登録
+* 広告依頼入力フォーム
+* 媒体選択
+* 媒体別の詳細条件入力
+* 複数広告パターンの追加・複製・削除
+* 所属・媒体に応じた担当部署の判定
+* 案件・媒体・パターン情報のDB保存
+* 部署別ダッシュボード
+* 案件ステータス管理
+* 担当者管理
+* 見積もり指標入力
+* 見積もり指標の自動計算
+* Slack Webhookによる通知
+
+---
+
+## 4. 業務画面
+
+### 4.1 ログイン / 新規登録
+
+ENTRY画面に入る前に、Email + Passwordでログインします。
+
+未登録の場合は、氏名・Email・Passwordを入力して新規登録できます。
+
+ログイン情報は `localStorage` に保存し、リロード後もログイン状態を復元します。
+
+---
+
+### 4.2 ENTRY
+
+所属・クライアント名・案件名などの基本情報を入力します。
+
+依頼者名・Emailはログイン情報から自動セットされるため、ENTRY画面では入力しません。
+
+所属については人事異動等を考慮し、ログイン後も毎回選択する仕様としています。
+
+---
+
+### 4.3 PLATFORMS
+
+依頼する媒体を選択し、マージン（掛け率）を設定します。
+
+現在、詳細フォームまで実装済みの媒体は以下の3媒体です。
+
+* YouTube
+* YG-Display&DGC
+* Listing
+
+以下の媒体はUI上には表示されていますが、詳細フォームは未実装です。
+
+* Meta
+* LINE
+* X
+* DV360
+
+未実装媒体は「近日対応」と表示し、現在は選択できないようにしています。
+
+---
+
+### 4.4 DETAIL-FORM
+
+選択した媒体ごとに、配信パターンを入力します。
+
+主な入力項目：
+
+* 配信メニュー
+* 配信期間
+* 予算
+* エリア
+* 性別
+* 年齢
+* デバイス
+* ターゲティング
+* 広告素材
+* 課金形態
+
+複数パターンがある場合は、パターンの追加・削除・複製が可能です。
+
+#### YouTubeの条件分岐
+
+例えば、
+
+**メニュー：スキップ不可**
+
+を選択した場合、
+
+* 配信面 → インストリームに自動固定
+* 選択項目 → グレーアウトして編集不可
+
+となります。
+
+さらに、
+
+**スキップ不可 × 広告素材30秒**
+
+の場合は、
+
+**デバイス → CTV**
+
+に自動固定されます。
+
+このように、媒体ごとの業務ルールをフォーム側へ組み込んでいます。
+
+---
+
+## 5. データ処理
+
+フォーム送信後、以下のような構造でデータを保存します。
+
+```text
+campaigns
+  │
+  ├── youtube_patterns
+  ├── yg_patterns
+  ├── listing_patterns
+  └── meta_patterns
+```
+
+案件情報と媒体別の配信パターンを分離して保存し、必要に応じて画面上で再構成しています。
+
+見積もり指標については `estimate_items` テーブルへ保存します。
+
+---
+
+## 6. 部署別ダッシュボード
+
+各媒体の運用担当部署は、`department.blade.php` から案件を確認します。
+
+案件は、
+
+```text
+クライアント
+  └── 案件
+       └── 配信パターン
+```
+
+という階層で表示します。
+
+パターン行をクリックすると詳細モーダルが開き、
+
+* 媒体
+* メニュー
+* 配信エリア
+* 性別
+* 年齢
+* デバイス
+* ターゲティング
+* 見積もり指標
+
+などを確認できます。
+
+また、以下の情報を更新できます。
+
+* ステータス
+* 担当者
+* 見積もり指標
+
+---
+
+## 7. 見積もり・シミュレーション
+
+課金形態や入力値に応じて、見積もり指標を自動計算します。
+
+対応している主な課金形態：
+
+* CPC
+* vCPM
+* CPV
+* CPM
+* YG-Display&DGCの複数パターン
+
+例えば、単価や予算などの入力値からIMP・クリック・CV等の指標を算出し、結果を確認できるようにしています。
+
+入力された見積もり情報は `estimate_items` テーブルへ保存します。
+
+---
+
+## 8. 技術スタック
+
+| 分類              | 技術                           |
+| --------------- | ---------------------------- |
+| Backend         | PHP / Laravel                |
+| Frontend        | JavaScript / Vue.js / jQuery |
+| Database        | MySQL                        |
+| Chart           | Chart.js                     |
+| Notification    | Slack Webhook                |
+| Build Tool      | Vite                         |
+| Development     | VS Code / XAMPP              |
+| Version Control | Git / GitHub                 |
+
+---
+
+## 9. ディレクトリ構成
+
+```text
+sim-form/
+├── app/
+│   └── Http/
+│       └── Controllers/
+│           ├── SubmitController.php
+│           └── RequesterController.php
+│
+├── database/
+│   └── migrations/
+│
+├── public/
+│   └── index.php
+│
+├── resources/
+│   ├── js/
+│   │   ├── app.js
+│   │   ├── env.d.ts
+│   │   └── components/
+│   │       ├── SimForm.vue
+│   │       ├── PF-Table.vue
+│   │       └── PF-Config.js
+│   │
+│   └── views/
+│       ├── welcome.blade.php
+│       ├── index.blade.php
+│       └── requests/
+│           ├── show.blade.php
+│           └── department.blade.php
+│
+├── routes/
+│   ├── web.php
+│   └── api.php
+│
+├── storage/
+│   └── logs/
+│       └── laravel.log
+│
+├── vite.config.js
+├── package.json
+├── .env.example
+└── README.md
+```
+
+---
+
+## 10. 主なファイル
+
+### `app/Http/Controllers/SubmitController.php`
+
+申請処理や部署別ダッシュボードに関する処理を担当する中核コントローラーです。
+
+| メソッド                | 役割                                    |
+| ------------------- | ------------------------------------- |
+| `store()`           | 入力内容を受け取り、`campaigns` と媒体別パターンテーブルへ保存 |
+| `department($slug)` | 部署別ダッシュボード用のデータを取得・整形                 |
+| `updateStatus()`    | 案件ステータスを更新                            |
+| `updateAssignee()`  | 案件担当者を更新                              |
+| `saveEstimate()`    | 見積もり指標を `estimate_items` に保存          |
+
+---
+
+### `app/Http/Controllers/RequesterController.php`
+
+依頼者のログイン・新規登録を担当します。
+
+パスワードは `Hash` ファサードを利用してハッシュ化し、`requesters` テーブルへ保存します。
+
+| メソッド         | 役割                         |
+| ------------ | -------------------------- |
+| `register()` | 氏名・Email・Passwordを受け取り新規登録 |
+| `login()`    | Email・Passwordを照合してログイン    |
+
+`requesters` テーブル：
+
+```text
+id
+name
+email
+password
+created_at
+updated_at
+```
+
+Emailにはunique制約を設定しています。
+
+---
+
+### `resources/js/components/SimForm.vue`
+
+依頼者側の申請フォーム本体です。
+
+```text
+LOGIN
+ ↓
+ENTRY
+ ↓
+PLATFORMS
+ ↓
+DETAIL-FORM
+ ↓
+SUBMIT
+```
+
+媒体ごとの入力フォームやパターンCRUD処理、条件分岐などを実装しています。
+
+---
+
+### `resources/views/requests/department.blade.php`
+
+部署別の案件管理画面です。
+
+案件の一覧表示、詳細モーダル、ステータス・担当者更新、見積もり指標入力などを担当します。
+
+---
+
+### `routes/api.php`
+
+Ajaxによるデータ送受信用のAPIルートを定義しています。
+
+主な処理：
+
+* 申請
+* ステータス更新
+* 担当者更新
+* 見積もり保存
+* パターン情報取得
+* ログイン
+* 新規登録
+
+---
+
+## 11. 開発で工夫した点
+
+### 11.1 複数パターンを扱えるGrid UI
+
+広告媒体や配信条件によって複数パターンの見積もりが発生するため、1件ずつ入力するのではなく、パターンを追加・複製できるUIにしています。
+
+---
+
+### 11.2 媒体ごとの業務ルールをフォームに反映
+
+媒体ごとに異なる入力項目や条件分岐を実装しています。
+
+単純な入力フォームではなく、
+
+**「この条件なら、この項目は選択できない」**
+
+といった業務上のルールをUI側へ組み込むことで、入力ミスを減らせる構成にしています。
+
+---
+
+### 11.3 データ構造と画面表示を分離
+
+データベースでは、
+
+```text
+依頼
+ └── 媒体
+      └── 配信パターン
+```
+
+という構造でデータを管理し、画面ではユーザーが扱いやすい形に再構成しています。
+
+---
+
+### 11.4 条件による担当部署の判定
+
+所属・媒体など複数の条件から担当部署を判定します。
+
+条件が重複する場合は優先順位を設け、想定外の条件に対してはフォールバックする構成としています。
+
+---
+
+### 11.5 Chart.jsの表示問題への対応
+
+非表示状態のタブ内でChart.jsを初期描画すると、グラフサイズが正しく計算されない問題が発生しました。
+
+そのため、タブが表示されたタイミングでグラフを再描画する処理を実装しています。
+
+---
+
+## 12. 画面
+
+### 依頼入力フォーム
+
+![依頼入力フォーム](docs/images/sim-form.png)
+
+ENTRY → PLATFORMS → DETAIL-FORMの流れで広告依頼を入力します。
+
+---
+
+### 部署別ダッシュボード
+
+![部署別ダッシュボード](docs/images/dashboard.png)
+
+部署ごとに案件・ステータス・担当者・見積もり情報を管理します。
+
+---
+
+### 見積もり・シミュレーション
+
+![見積もり・シミュレーション](docs/images/estimate.png)
+
+入力された条件をもとに見積もり指標を計算します。
+
+※画面にはポートフォリオ用のダミーデータを使用しています。
+
+---
+
+## 13. 開発環境
+
+* Windows
+* VS Code
+* XAMPP
+* Git
+* GitHub
+
+フロントエンドのビルドにはViteを使用しています。
+
+```bash
+npm run dev
+```
+
+または、
+
+```bash
+npm run build
+```
+
+でフロントエンドをビルドします。
+
+---
+
+## 14. 開発時の注意点
+
+Laravel + Vite構成のため、`resources/js` 配下のVueファイル等を変更した場合は、Viteによるビルドが必要です。
+
+開発時は、
+
+```bash
+npm run dev
+```
+
+本番用ビルドでは、
+
+```bash
+npm run build
+```
+
+を使用します。
+
+また、`.env` にはDB接続情報やAPP_KEY等の環境変数が含まれるため、Git管理対象には含めていません。
+
+---
+
+## 15. 未実装・今後の課題
+
+### 媒体対応
+
+以下の媒体は旧GAS版では実装済みですが、本プロジェクトでは未移植です。
+
+* Meta
+* LINE
+* X
+* DV360
+
+---
+
+### その他
+
+* YouTube「目標FQ系」メニューの一部課金形態の整理
+* 旧Notion DBからMySQLへのデータ移行
+* 既存データとの整合性確認
+* `listing_patterns` / `campaigns` 等のマイグレーション整理
+* テストコードの拡充
+* エラーハンドリングの強化
+* 認証・権限管理
+* パスワードリセット
+* Google/Facebook等の外部ログイン
+* 本番環境へのデプロイ
+* 運用を想定したログ・監視機能
+
+---
+
+## 16. 開発について
+
+本プロジェクトでは、単純に既存システムをLaravelへ書き換えるだけではなく、
+
+**「実際の業務をどのようなデータ構造・画面・処理に落とし込むか」**
+
+を考えながら開発しています。
+
+要件整理、画面設計、データ構造の検討、フロントエンド・バックエンド実装、API連携、デバッグ、UI改善まで一通り取り組んでいます。
+
+また、開発時にはAIをコード理解・デバッグ・設計検討の壁打ちとして活用していますが、生成されたコードをそのまま利用するのではなく、処理内容を確認しながら実装しています。
+
+---
+
+## 17. 注意事項
+
+本リポジトリはポートフォリオ・学習目的で公開しています。
+
+実際の業務データ、顧客情報、認証情報、APIキー、Webhook URL等は含めていません。
